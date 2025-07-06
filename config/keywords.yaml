@@ -1,0 +1,55 @@
+cloud:
+  - AWS
+  - Amazon Web Services
+  - GCP
+  - Google Cloud Platform
+  - Azure
+  - Microsoft Azure
+  - Kubernetes
+  - k8s
+  - Docker
+  - コンテナ
+  - クラウド
+  - サーバーレス
+  - Lambda
+  - Cloud Functions
+  - Cloud Run
+  - ECS
+  - EKS
+  - AKS
+  - GKE
+  - S3
+  - CloudFormation
+  - Terraform
+  - インフラ
+  - DevOps
+  - CI/CD
+
+ai:
+  - GPT
+  - LLM
+  - 生成AI
+  - 生成ＡＩ
+  - ChatGPT
+  - Claude
+  - Gemini
+  - OpenAI
+  - 機械学習
+  - ML
+  - MLOps
+  - Deep Learning
+  - ディープラーニング
+  - 自然言語処理
+  - NLP
+  - 画像認識
+  - Computer Vision
+  - AI
+  - 人工知能
+  - Transformer
+  - BERT
+  - 大規模言語モデル
+  - ファインチューニング
+  - RAG
+  - Vector Database
+  - 埋め込み
+  - Embedding
