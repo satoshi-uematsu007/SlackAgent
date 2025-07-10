@@ -10,6 +10,7 @@ torch==2.1.2
 transformers==4.35.2
 numpy==1.26.4
 sentencepiece==0.1.99
+protobuf==4.25.3
 
 # テスト用依存関係
 pytest==7.4.3
