@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import List, Dict, Any
 import logging
 from utils.logger import setup_logger, log_error
+import json
 
 class NotifierAgent:
     """
@@ -55,6 +56,10 @@ class NotifierAgent:
                 trust_score = article.get('trust_score', 0)
                 trust_emoji = self._get_trust_emoji(trust_score)
 
+                # テキストをサニタイズ
+                title = self._sanitize_text(title)
+                summary = self._sanitize_text(summary)
+
                 if len(summary) > 130:
                     summary = summary[:127] + "..."
 
@@ -70,16 +75,15 @@ class NotifierAgent:
                 trust_score = article.get('trust_score', 0)
                 trust_emoji = self._get_trust_emoji(trust_score)
 
+                # テキストをサニタイズ
+                title = self._sanitize_text(title)
+                summary = self._sanitize_text(summary)
+
                 if len(summary) > 130:
                     summary = summary[:127] + "..."
 
                 lines.append(f"{i}. {trust_emoji} *<{url}|{title}>* (信頼度: {trust_score})")
                 lines.append(f"　・{summary}\n")
-
-        total_articles = len(cloud_articles) + len(ai_articles)
-        avg_trust_cloud = self._calculate_average_trust(cloud_articles)
-        avg_trust_ai = self._calculate_average_trust(ai_articles)
-
 
         lines.append("*■信頼度スコア*")
         lines.append("⭐⭐⭐ 10-9: 公式・企業公式")
@@ -88,11 +92,33 @@ class NotifierAgent:
 
         return "\n".join(lines)
 
+    def _sanitize_text(self, text: str) -> str:
+        """
+        Slackで問題を起こす可能性のある文字をサニタイズ
+        """
+        if not text:
+            return ""
+        
+        # 特殊文字をエスケープ
+        text = text.replace('&', '&amp;')
+        text = text.replace('<', '&lt;')
+        text = text.replace('>', '&gt;')
+        
+        # 制御文字を削除
+        text = ''.join(char for char in text if ord(char) >= 32 or char in '\n\t')
+        
+        return text
+
     def _send_to_slack(self, message: str) -> bool:
         """
-        Block Kit を使ってメッセージを送信
+        Block Kit を使ってメッセージを送信（エラー詳細付き）
         """
         try:
+            # メッセージの長さチェック
+            if len(message) > 3000:
+                self.logger.warning(f"メッセージが長すぎます: {len(message)}文字")
+                message = message[:2900] + "\n\n...(省略)"
+
             payload = {
                 "blocks": [
                     {
@@ -107,16 +133,34 @@ class NotifierAgent:
                 "icon_emoji": ":newspaper:"
             }
 
+            # デバッグ用：ペイロードをログに出力
+            self.logger.debug(f"Slack payload: {json.dumps(payload, ensure_ascii=False, indent=2)}")
+
             response = self.session.post(
                 self.webhook_url,
                 json=payload,
                 timeout=30
             )
 
+            # レスポンス内容をログに出力
+            self.logger.debug(f"Slack response status: {response.status_code}")
+            self.logger.debug(f"Slack response headers: {dict(response.headers)}")
+            self.logger.debug(f"Slack response body: {response.text}")
+
             response.raise_for_status()
             return True
 
         except requests.RequestException as e:
+            # より詳細なエラー情報を記録
+            error_details = {
+                "status_code": getattr(e.response, 'status_code', None),
+                "response_text": getattr(e.response, 'text', None),
+                "request_url": getattr(e.request, 'url', None),
+                "request_headers": dict(getattr(e.request, 'headers', {})),
+                "request_body": getattr(e.request, 'body', None)
+            }
+            
+            self.logger.error(f"Slack送信エラー詳細: {error_details}")
             log_error(self.logger, e, "Slack送信エラー")
             return False
 
@@ -147,3 +191,28 @@ class NotifierAgent:
 
         self.logger.info(f"信頼度統計 - 平均: {sum(trust_scores)/len(trust_scores):.1f}")
         self.logger.info(f"高: {high}, 中: {medium}, 低: {low}, 不明: {unknown}")
+
+    def test_webhook(self) -> bool:
+        """
+        Webhookをテストする簡単なメソッド
+        """
+        try:
+            test_payload = {
+                "text": "テストメッセージ - Webhook接続確認"
+            }
+            
+            response = self.session.post(
+                self.webhook_url,
+                json=test_payload,
+                timeout=10
+            )
+            
+            self.logger.info(f"テスト送信 - ステータス: {response.status_code}")
+            self.logger.info(f"テスト送信 - レスポンス: {response.text}")
+            
+            response.raise_for_status()
+            return True
+            
+        except requests.RequestException as e:
+            self.logger.error(f"Webhookテストエラー: {e}")
+            return False
