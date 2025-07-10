@@ -1,0 +1,28 @@
+# .github/workflows/python-script.yml
+name: Run main.py periodically
+
+on:
+  schedule:
+    - cron: '0 12 * * *'  # 毎日12:00 UTCに実行（日本時間で21:00）
+  workflow_dispatch:       # 手動実行も可能にする
+
+jobs:
+  run-python-script:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: リポジトリをチェックアウト
+        uses: actions/checkout@v3
+
+      - name: Python をセットアップ
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'  # ご使用のバージョンに合わせて変更可能
+
+      - name: 依存パッケージのインストール
+        run: |
+          pip install -r requirements.txt
+
+      - name: main.py の実行
+        run: |
+          python main.py
