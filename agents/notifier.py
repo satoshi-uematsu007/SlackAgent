@@ -5,7 +5,6 @@ import logging
 from utils.logger import setup_logger, log_error
 import json
 
-
 class NotifierAgent:
     def __init__(self, webhook_url: str, log_level: str = "INFO"):
         self.logger = setup_logger("NotifierAgent", log_level)
@@ -24,7 +23,6 @@ class NotifierAgent:
             ai_articles.sort(key=lambda x: x.get('trust_score', 0), reverse=True)
 
             blocks = self._create_blocks(cloud_articles, ai_articles)
-
             success = self._send_to_slack(blocks)
 
             if success:
@@ -68,8 +66,9 @@ class NotifierAgent:
                 trust_score = article.get("trust_score", 0)
                 emoji = self._get_trust_emoji(trust_score)
 
-                if len(summary) > 130:
-                    summary = summary[:127] + "..."
+                # ✅ 要約の長さを 600文字に制限
+                if len(summary) > 600:
+                    summary = summary[:597] + "..."
 
                 blocks.append({
                     "type": "section",
@@ -121,10 +120,8 @@ class NotifierAgent:
 
         except requests.RequestException as e:
             self.logger.error("Slack送信エラー: " + str(e))
-
             if e.response is not None:
                 self.logger.error(f"Status: {e.response.status_code}, Body: {e.response.text}")
-
             log_error(self.logger, e, "Slack送信エラー")
             return False
 
