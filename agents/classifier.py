@@ -1,30 +1,31 @@
 from typing import List, Dict, Any
 
-from transformers import pipeline
+import yaml
 
 from utils.logger import setup_logger, log_error
 
 
 class ClassifierAgent:
-    """Hugging Faceのゼロショット分類モデルで記事を分類するエージェント"""
+    """キーワード辞書を用いたルールベースの記事分類エージェント"""
 
     def __init__(self, log_level: str = "INFO"):
         self.logger = setup_logger("ClassifierAgent", log_level)
 
-        # 無料で利用できるゼロショット分類モデルを初期化
-        self.model = pipeline(
-            "zero-shot-classification",
-            model="facebook/bart-large-mnli",
-        )
+        # キーワード辞書読み込み
+        try:
+            with open("config/keywords.yaml", "r") as f:
+                data = yaml.safe_load(f)
+        except Exception as e:
+            log_error(self.logger, e, "キーワード読み込み失敗")
+            data = {}
 
-        # 分類候補ラベル
-        self.labels = ["Cloud", "AI"]
-
-        # スコア閾値（これ未満は "Other" とみなす）
-        self.threshold = 0.5
+        self.keyword_dict = {
+            "Cloud": [kw.lower() for kw in data.get("cloud", [])],
+            "AI": [kw.lower() for kw in data.get("ai", [])],
+        }
 
     def classify_articles(self, articles: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """記事をAIで分類する"""
+        """キーワードルールに基づき記事を分類する"""
 
         self.logger.info(f"記事分類開始: {len(articles)}件")
 
@@ -36,22 +37,24 @@ class ClassifierAgent:
             if url in processed_urls:
                 continue
 
-            text = f"{article.get('title', '')}\n{article.get('content', '')}"
+            text = f"{article.get('title', '')} {article.get('content', '')}".lower()
 
-            try:
-                result = self.model(text, candidate_labels=self.labels, multi_label=False)
-                label = result["labels"][0]
-                score = float(result["scores"][0])
-            except Exception as e:
-                log_error(self.logger, e, "分類エラー")
+            cloud_count = sum(1 for kw in self.keyword_dict["Cloud"] if kw.lower() in text)
+            ai_count = sum(1 for kw in self.keyword_dict["AI"] if kw.lower() in text)
+
+            if cloud_count == 0 and ai_count == 0:
                 continue
 
-            if score < self.threshold:
-                continue
+            if cloud_count >= ai_count:
+                label = "Cloud"
+                score = cloud_count / max(1, cloud_count + ai_count)
+            else:
+                label = "AI"
+                score = ai_count / max(1, cloud_count + ai_count)
 
             article_classified = article.copy()
             article_classified["category"] = label
-            article_classified["classification_confidence"] = score
+            article_classified["classification_confidence"] = min(1.0, score)
             classified.append(article_classified)
             processed_urls.add(url)
 
