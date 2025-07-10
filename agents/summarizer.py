@@ -5,6 +5,7 @@ import nltk
 from transformers import pipeline
 from typing import List, Dict, Any
 import logging
+import re
 from utils.logger import setup_logger, log_error
 
 class SummarizerAgent:
@@ -35,6 +36,28 @@ class SummarizerAgent:
                 nltk.download('punkt', quiet=True)
             except Exception as e:
                 log_error(self.logger, e, "NLTK punkt ダウンロード失敗")
+
+    def _clean_text(self, text: str) -> str:
+        """要約前後のテキストを簡易クリーニング"""
+        if not text:
+            return ""
+
+        # API仕様などで出力されがちなスキーマ表記を除去
+        text = re.sub(
+            r'application/[\w.+-]+\s*:?\s*schema\s*:?\s*\$ref\s*:?"?#/[^"\s]+"?',
+            '',
+            text,
+            flags=re.IGNORECASE,
+        )
+
+        # 分割された英字列を結合 ("l u g e" -> "luge")
+        split_word_pattern = re.compile(r"\b(?:[A-Za-z]{1,2}\s+){1,4}[A-Za-z]{1,2}\b")
+        text = split_word_pattern.sub(lambda m: m.group().replace(" ", ""), text)
+
+        # 連続する空白を1つに
+        text = re.sub(r'\s+', ' ', text)
+
+        return text.strip()
     
     def summarize_articles(self, articles: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         "記事リストを要約"
@@ -45,6 +68,7 @@ class SummarizerAgent:
         for article in articles:
             try:
                 summary = self._summarize_single_article(article)
+                summary = self._clean_text(summary)
                 article_with_summary = article.copy()
                 article_with_summary['summary'] = summary
                 summarized_articles.append(article_with_summary)
@@ -61,11 +85,11 @@ class SummarizerAgent:
     
     def _summarize_single_article(self, article: Dict[str, Any]) -> str:
         "単一記事の要約"
-        content = article.get('content', '')
+        content = self._clean_text(article.get('content', ''))
         
         # 本文が短い場合はそのまま返す
         if len(content) < 200:
-            return content[:300]
+            return self._clean_text(content[:300])
         
         # まずAIモデルで要約を試みる
         if self.ai_summarizer is not None:
@@ -76,7 +100,7 @@ class SummarizerAgent:
                     min_length=50,
                     do_sample=False,
                 )
-                summary = result[0]["summary_text"].strip()
+                summary = self._clean_text(result[0]["summary_text"].strip())
                 if len(summary) > 300:
                     summary = summary[:297] + "..."
                 return summary
@@ -88,6 +112,7 @@ class SummarizerAgent:
             parser = PlaintextParser.from_string(content, self.tokenizer)
             summary_sentences = self.lexrank_summarizer(parser.document, self.max_sentences)
             summary = ' '.join([str(sentence) for sentence in summary_sentences])
+            summary = self._clean_text(summary)
 
             if len(summary) > 300:
                 summary = summary[:297] + "..."
@@ -101,7 +126,7 @@ class SummarizerAgent:
     
     def _fallback_summary(self, article: Dict[str, Any]) -> str:
         "フォールバック要約（簡単な文字数制限）"
-        content = article.get('content', '')
+        content = self._clean_text(article.get('content', ''))
         
         if len(content) > 300:
             # 句読点で区切って適切な位置で切る
@@ -116,6 +141,5 @@ class SummarizerAgent:
             if not summary:
                 summary = content[:250]
             
-            return summary + "..."
-        
-        return content
+            return self._clean_text(summary + "...")
+        return self._clean_text(content)
