@@ -4,12 +4,10 @@ from typing import List, Dict, Any, Set
 import logging
 from utils.logger import setup_logger
 
-class ImprovedClassifierAgent:
+class ClassifierAgent:
     """
-    改善された記事分類エージェント
-    - 重複除去機能
-    - 優先度ベースの分類
-    - 複合カテゴリ対応
+    記事分類エージェント
+    ルールベースで記事を「Cloud」「AI」「Other」に分類
     """
     
     def __init__(self, log_level: str = "INFO"):
