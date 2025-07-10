@@ -18,10 +18,11 @@ class SummarizerAgent:
 
         try:
             genai.configure(api_key=api_key)
-            self.gemini_model = genai.GenerativeModel("gemini-pro")
-            self.logger.info("Gemini モデルの初期化に成功しました。")
+            # ✅ モデル名を最新かつ対応済みに変更
+            self.gemini_model = genai.GenerativeModel("gemini-2.5-pro")
+            self.logger.info("Gemini モデル（gemini-2.5-pro）の初期化に成功しました。")
         except Exception as e:
-            log_error(self.logger, e, "Gemini API 初期化失敗")
+            log_error(self.logger, e, "Gemini API 初期化失敗（モデル設定エラーの可能性あり）")
             self.gemini_model = None
 
     def summarize_articles(self, articles: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -61,6 +62,5 @@ class SummarizerAgent:
             response = self.gemini_model.generate_content(prompt)
             return response.text.strip()
         except Exception as e:
-            error_msg = f"Gemini 要約失敗: {str(e)}"
-            self.logger.warning(error_msg)
+            self.logger.warning(f"Gemini 要約失敗: {str(e)}")
             return "（Geminiによる要約に失敗しました）"
