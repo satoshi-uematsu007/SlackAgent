@@ -1,6 +1,7 @@
 # .github/workflows/python-script.yml
 name: Run main.py periodically
-
+env:
+    SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 on:
   schedule:
     - cron: '0 12 * * *'  # 毎日12:00 UTCに実行（日本時間で21:00）
