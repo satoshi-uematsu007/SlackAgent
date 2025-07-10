@@ -44,10 +44,10 @@ class NotifierAgent:
 
     def _create_message(self, cloud_articles: List[Dict], ai_articles: List[Dict]) -> str:
         today = datetime.now().strftime('%Y-%m-%d')
-        lines = [f"*📰 今日のクラウド & AI記事まとめ（{today}）*\n"]
+        lines = [f"*今日のクラウド & AI記事まとめ（{today}）*\n"]
 
         if cloud_articles:
-            lines.append("*☁️ クラウド関連記事*")
+            lines.append("*■クラウド関連記事*")
             for i, article in enumerate(cloud_articles[:5], 1):
                 title = article.get('title', 'No Title')
                 url = article.get('url', '#')
@@ -62,7 +62,7 @@ class NotifierAgent:
                 lines.append(f"　・{summary}\n")
 
         if ai_articles:
-            lines.append("*🤖 AI関連記事*")
+            lines.append("*■AI関連記事*")
             for i, article in enumerate(ai_articles[:5], 1):
                 title = article.get('title', 'No Title')
                 url = article.get('url', '#')
@@ -80,12 +80,8 @@ class NotifierAgent:
         avg_trust_cloud = self._calculate_average_trust(cloud_articles)
         avg_trust_ai = self._calculate_average_trust(ai_articles)
 
-        lines.append("*📊 今日の記事統計*")
-        lines.append(f"• クラウド: {len(cloud_articles)}件 (平均信頼度: {avg_trust_cloud:.1f})")
-        lines.append(f"• AI: {len(ai_articles)}件 (平均信頼度: {avg_trust_ai:.1f})")
-        lines.append(f"• 合計: {total_articles}件\n")
 
-        lines.append("*🔍 信頼度スコア*")
+        lines.append("*■信頼度スコア*")
         lines.append("⭐⭐⭐ 10-9: 公式・企業公式")
         lines.append("⭐⭐ 8-7: 信頼性の高い技術メディア")
         lines.append("⭐ 6-5: 一般的な技術ブログ")
