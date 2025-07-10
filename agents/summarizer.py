@@ -43,10 +43,15 @@ class SummarizerAgent:
             return ""
 
         # API仕様などで出力されがちなスキーマ表記を除去
-        text = re.sub(r'application/\w+:schema:\$ref:"#/.+?"', '', text, flags=re.IGNORECASE)
+        text = re.sub(
+            r'application/\w+\s*:\s*schema\s*:\s*\$ref:"?#/[^"]+"?',
+            '',
+            text,
+            flags=re.IGNORECASE,
+        )
 
-        # 1文字ごとの分割を連結 ("lu ge" -> "luge")
-        text = re.sub(r'(?<=\b[A-Za-z])\s+(?=[A-Za-z]\b)', '', text)
+        # 分割された英単語を連結 ("lu ge" -> "luge")
+        text = re.sub(r'(?<=[A-Za-z])\s+(?=[A-Za-z])', '', text)
 
         # 連続する空白を1つに
         text = re.sub(r'\s+', ' ', text)
