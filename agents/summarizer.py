@@ -9,7 +9,7 @@ class SummarizerAgent:
 
     def __init__(self, log_level: str = "INFO"):
         self.logger = setup_logger("SummarizerAgent", log_level)
-
+a
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
             self.logger.error("環境変数 GEMINI_API_KEY が設定されていません。Gemini 要約は無効化されます。")
@@ -19,7 +19,7 @@ class SummarizerAgent:
         try:
             genai.configure(api_key=api_key)
             # ✅ モデル名を最新かつ対応済みに変更
-            self.gemini_model = genai.GenerativeModel("gemini-2.5-pro")
+            self.gemini_model = genai.GenerativeModel("gemini-2.5-flash")
             self.logger.info("Gemini モデル（gemini-2.5-pro）の初期化に成功しました。")
         except Exception as e:
             log_error(self.logger, e, "Gemini API 初期化失敗（モデル設定エラーの可能性あり）")
