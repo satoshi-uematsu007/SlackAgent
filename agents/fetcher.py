@@ -360,7 +360,12 @@ class FetcherAgent:
                 if self._matches_keywords(content):
                     # 本文取得試行
                     full_content = self._fetch_full_content(entry.link)
-                    
+
+                    # 日本語記事のみを抽出
+                    combined = f"{title} {full_content or summary}"
+                    if not self._is_japanese(combined):
+                        continue
+
                     article = {
                         'title': title,
                         'url': entry.link,
@@ -432,5 +437,12 @@ class FetcherAgent:
             if url not in seen_urls:
                 seen_urls.add(url)
                 unique_articles.append(article)
-        
+
         return unique_articles
+
+    def _is_japanese(self, text: str) -> bool:
+        """簡易的な日本語判定"""
+        if not text:
+            return False
+        japanese_chars = re.findall(r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]", text)
+        return len(japanese_chars) >= max(1, int(len(text) * 0.1))
