@@ -444,5 +444,5 @@ class FetcherAgent:
         """簡易的な日本語判定"""
         if not text:
             return False
-        japanese_chars = re.findall(r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]", text)
+        japanese_chars = re.findall("[぀-ヿ㐀-䶿一-鿿]", text)
         return len(japanese_chars) >= max(1, int(len(text) * 0.1))
