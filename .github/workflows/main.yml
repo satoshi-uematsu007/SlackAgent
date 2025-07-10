@@ -1,7 +1,8 @@
 # .github/workflows/python-script.yml
 name: Run main.py periodically
 env:
-    SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+  SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+  GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 on:
   schedule:
     - cron: '0 21 * * *'  # 毎日21:00 UTCに実行（日本時間で6:00）
