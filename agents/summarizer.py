@@ -10,9 +10,16 @@ class SummarizerAgent:
     def __init__(self, log_level: str = "INFO"):
         self.logger = setup_logger("SummarizerAgent", log_level)
 
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            self.logger.error("環境変数 GEMINI_API_KEY が設定されていません。Gemini 要約は無効化されます。")
+            self.gemini_model = None
+            return
+
         try:
-            genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+            genai.configure(api_key=api_key)
             self.gemini_model = genai.GenerativeModel("gemini-pro")
+            self.logger.info("Gemini モデルの初期化に成功しました。")
         except Exception as e:
             log_error(self.logger, e, "Gemini API 初期化失敗")
             self.gemini_model = None
@@ -25,34 +32,35 @@ class SummarizerAgent:
         for article in articles:
             try:
                 summary = self._summarize_single_article(article)
-                article_with_summary = article.copy()
-                article_with_summary['summary'] = summary
-                summarized_articles.append(article_with_summary)
             except Exception as e:
                 log_error(self.logger, e, f"要約エラー: {article.get('title', 'Unknown')}")
-                article_with_summary = article.copy()
-                article_with_summary['summary'] = "要約に失敗しました。"
-                summarized_articles.append(article_with_summary)
+                summary = "要約に失敗しました。"
+
+            article_with_summary = article.copy()
+            article_with_summary['summary'] = summary
+            summarized_articles.append(article_with_summary)
 
         self.logger.info(f"要約完了: {len(summarized_articles)}件")
         return summarized_articles
 
     def _summarize_single_article(self, article: Dict[str, Any]) -> str:
         "Gemini を使って要約を生成（500文字程度）"
-        content = article.get('content', '')
+        content = article.get('content', '').strip()
 
-        if not content.strip():
+        if not content:
             return "（本文が空のため要約できません）"
 
-        if self.gemini_model is not None:
-            try:
-                prompt = (
-                    "以下の日本語記事を500文字以内で、要点をわかりやすく自然な文章で要約してください。\n\n"
-                    f"{content}"
-                )
-                response = self.gemini_model.generate_content(prompt)
-                return response.text.strip()
-            except Exception as e:
-                self.logger.debug(f"Gemini 要約失敗: {str(e)}")
+        if not self.gemini_model:
+            return "（Geminiモデルが初期化されていません）"
 
-        return "（Geminiによる要約に失敗しました）"
+        try:
+            prompt = (
+                "以下の日本語記事を500文字以内で、要点をわかりやすく自然な文章で要約してください。\n\n"
+                f"{content}"
+            )
+            response = self.gemini_model.generate_content(prompt)
+            return response.text.strip()
+        except Exception as e:
+            error_msg = f"Gemini 要約失敗: {str(e)}"
+            self.logger.warning(error_msg)
+            return "（Geminiによる要約に失敗しました）"
