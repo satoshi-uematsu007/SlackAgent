@@ -1,21 +1,29 @@
 from sumy.parsers.plaintext import PlaintextParser
 from sumy.nlp.tokenizers import Tokenizer
 from sumy.summarizers.lex_rank import LexRankSummarizer
-from sumy.summarizers.text_rank import TextRankSummarizer
 import nltk
+from transformers import pipeline
 from typing import List, Dict, Any
 import logging
 from utils.logger import setup_logger, log_error
 
 class SummarizerAgent:
-    "事要約エージェント:無料ライブラリ(sumy)を使用して記事を要約"
+    "AIモデルを用いて記事を要約するエージェント"
     
     def __init__(self, log_level: str = "INFO"):
         self.logger = setup_logger("SummarizerAgent", log_level)
         self._setup_nltk()
-        self.summarizer = LexRankSummarizer()
         self.tokenizer = Tokenizer('japanese')
+        self.lexrank_summarizer = LexRankSummarizer()
         self.max_sentences = 3
+        try:
+            self.ai_summarizer = pipeline(
+                "summarization",
+                model="sonoisa/t5-base-japanese",
+            )
+        except Exception as e:
+            log_error(self.logger, e, "AI要約モデルロード失敗")
+            self.ai_summarizer = None
     
     def _setup_nltk(self):
         "NLTK データダウンロード"
@@ -59,24 +67,36 @@ class SummarizerAgent:
         if len(content) < 200:
             return content[:300]
         
+        # まずAIモデルで要約を試みる
+        if self.ai_summarizer is not None:
+            try:
+                result = self.ai_summarizer(
+                    content,
+                    max_length=150,
+                    min_length=50,
+                    do_sample=False,
+                )
+                summary = result[0]["summary_text"].strip()
+                if len(summary) > 300:
+                    summary = summary[:297] + "..."
+                return summary
+            except Exception as e:
+                self.logger.debug(f"AI要約失敗: {str(e)}")
+
+        # フォールバックとして LexRank 要約
         try:
-            # sumy を使用した要約
             parser = PlaintextParser.from_string(content, self.tokenizer)
-            summary_sentences = self.summarizer(parser.document, self.max_sentences)
-            
+            summary_sentences = self.lexrank_summarizer(parser.document, self.max_sentences)
             summary = ' '.join([str(sentence) for sentence in summary_sentences])
-            
-            # 文字数制限
+
             if len(summary) > 300:
                 summary = summary[:297] + "..."
             elif len(summary) < 50:
-                # 要約が短すぎる場合は元の記事を使用
                 summary = content[:300]
-            
+
             return summary
-            
         except Exception as e:
-            self.logger.debug(f"sumy要約失敗: {str(e)}")
+            self.logger.debug(f"LexRank要約失敗: {str(e)}")
             return self._fallback_summary(article)
     
     def _fallback_summary(self, article: Dict[str, Any]) -> str:
