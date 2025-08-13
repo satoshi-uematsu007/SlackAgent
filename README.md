@@ -72,6 +72,18 @@ python test_system.py --send-test
 python main.py
 ```
 
+### 4. Expo モバイルアプリ配布
+
+```bash
+cd mobile-app
+npm install
+npx expo login               # Expoアカウントでログイン
+npx eas build -p android --profile production
+npx eas build -p ios --profile production
+```
+
+Expo のダッシュボードから生成されたビルドをダウンロードし、アプリストアへ配布できます。
+
 ## 📂 ディレクトリ構成
 
 ```
@@ -87,6 +99,7 @@ news_agent/
 │   └── keywords.yaml         # 分類キーワード
 ├── utils/
 │   └── logger.py             # ログ管理
+├── mobile-app/               # Expoベースのモバイルアプリ
 ├── .env                      # 環境変数
 ├── requirements.txt          # 依存関係
 ├── test_system.py            # テストスクリプト
