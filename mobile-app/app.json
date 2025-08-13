@@ -5,6 +5,10 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "platforms": ["ios", "android", "web"],
-    "assetBundlePatterns": ["**/*"]
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "bundleIdentifier": "com.example.slackagent",
+      "supportsTablet": true
+    }
   }
 }

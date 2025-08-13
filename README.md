@@ -74,15 +74,18 @@ python main.py
 
 ### 4. Expo モバイルアプリ配布
 
+App Store 配布にあたり、先に `mobile-app/app.json` の `ios.bundleIdentifier` を自分の App ID に設定してください。
+
 ```bash
 cd mobile-app
 npm install
 npx expo login               # Expoアカウントでログイン
 npx eas build -p android --profile production
 npx eas build -p ios --profile production
+npx eas submit -p ios --latest
 ```
 
-Expo のダッシュボードから生成されたビルドをダウンロードし、アプリストアへ配布できます。
+Expo のダッシュボードから生成されたビルドを確認し、`eas submit` で App Store Connect へアップロードできます。
 
 ## 📂 ディレクトリ構成
 
