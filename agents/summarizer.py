@@ -1,32 +1,36 @@
 import os
-import logging
 from typing import List, Dict, Any
-import google.generativeai as genai
+
+from langchain_google_genai import ChatGoogleGenerativeAI
 from utils.logger import setup_logger, log_error
 
 class SummarizerAgent:
-    "Google Gemini を用いて記事を要約するエージェント"
+    """LangChain を通じて Google Gemini で記事要約を行うエージェント"""
 
     def __init__(self, log_level: str = "INFO"):
         self.logger = setup_logger("SummarizerAgent", log_level)
 
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
-            self.logger.error("環境変数 GEMINI_API_KEY が設定されていません。Gemini 要約は無効化されます。")
-            self.gemini_model = None
+            self.logger.error(
+                "環境変数 GEMINI_API_KEY が設定されていません。Gemini 要約は無効化されます。"
+            )
+            self.llm = None
             return
 
         try:
-            genai.configure(api_key=api_key)
-            # ✅ 最新の軽量モデル（高速対応）に更新
-            self.gemini_model = genai.GenerativeModel("models/gemini-1.5-flash")
-            self.logger.info("Gemini モデル（gemini-1.5-flash）の初期化に成功しました。")
+            self.llm = ChatGoogleGenerativeAI(
+                model="gemini-1.5-flash", google_api_key=api_key
+            )
+            self.logger.info(
+                "Gemini モデル（gemini-1.5-flash）を LangChain 経由で初期化しました。"
+            )
         except Exception as e:
-            log_error(self.logger, e, "Gemini API 初期化失敗（モデル設定エラーの可能性あり）")
-            self.gemini_model = None
+            log_error(self.logger, e, "Gemini API 初期化失敗")
+            self.llm = None
 
     def summarize_articles(self, articles: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        "記事リストを要約"
+        """記事リストを要約"""
         self.logger.info(f"記事要約開始: {len(articles)}件")
         summarized_articles = []
 
@@ -38,7 +42,7 @@ class SummarizerAgent:
                 summary = "要約に失敗しました。"
 
             article_with_summary = article.copy()
-            article_with_summary['summary'] = summary
+            article_with_summary["summary"] = summary
             summarized_articles.append(article_with_summary)
 
         self.logger.info(f"要約完了: {len(summarized_articles)}件")
@@ -51,7 +55,7 @@ class SummarizerAgent:
         if not content:
             return "（本文が空のため要約できません）"
 
-        if not self.gemini_model:
+        if not self.llm:
             return "（Geminiモデルが初期化されていません）"
 
         try:
@@ -59,8 +63,8 @@ class SummarizerAgent:
                 "以下の日本語記事を500文字以内で、要点をわかりやすく自然な文章で要約してください。\n\n"
                 f"{content}"
             )
-            response = self.gemini_model.generate_content(prompt)
-            return response.text.strip()
+            response = self.llm.invoke(prompt)
+            return response.content.strip()
         except Exception as e:
             self.logger.warning(f"Gemini 要約失敗: {str(e)}")
             return "（Geminiによる要約に失敗しました）"

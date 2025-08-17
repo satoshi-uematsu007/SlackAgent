@@ -1,15 +1,35 @@
+import os
+import json
 import requests
 from datetime import datetime
 from typing import List, Dict, Any
-import logging
+
+from langchain_google_genai import ChatGoogleGenerativeAI
 from utils.logger import setup_logger, log_error
-import json
 
 class NotifierAgent:
     def __init__(self, webhook_url: str, log_level: str = "INFO"):
         self.logger = setup_logger("NotifierAgent", log_level)
         self.webhook_url = webhook_url
         self.session = requests.Session()
+
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            self.logger.error(
+                "環境変数 GEMINI_API_KEY が設定されていません。コメント生成は無効化されます。"
+            )
+            self.llm = None
+        else:
+            try:
+                self.llm = ChatGoogleGenerativeAI(
+                    model="gemini-1.5-flash", google_api_key=api_key
+                )
+                self.logger.info(
+                    "Gemini モデル（gemini-1.5-flash）を LangChain 経由で初期化しました。"
+                )
+            except Exception as e:
+                log_error(self.logger, e, "Gemini API 初期化失敗")
+                self.llm = None
 
     def send_notification(self, articles: List[Dict[str, Any]]) -> bool:
         if not articles:
@@ -63,6 +83,9 @@ class NotifierAgent:
                 title = self._sanitize_text(article.get("title", "No Title"))
                 url = article.get("url", "#")
                 summary = self._sanitize_text(article.get("summary", "No Summary"))
+                comment = self._sanitize_text(
+                    self._generate_comment(summary, tone="friendly")
+                )
                 trust_score = article.get("trust_score", 0)
                 emoji = self._get_trust_emoji(trust_score)
 
@@ -70,12 +93,12 @@ class NotifierAgent:
                 if len(summary) > 600:
                     summary = summary[:597] + "..."
 
+                text = f"{i}. {emoji} *<{url}|{title}>* (信頼度: {trust_score})\n　・{summary}"
+                if comment:
+                    text += f"\n　・{comment}"
                 blocks.append({
                     "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": f"{i}. {emoji} *<{url}|{title}>* (信頼度: {trust_score})\n　・{summary}"
-                    }
+                    "text": {"type": "mrkdwn", "text": text}
                 })
 
         add_article_blocks("クラウド", cloud_articles)
@@ -91,6 +114,20 @@ class NotifierAgent:
         })
 
         return blocks
+
+    def _generate_comment(self, summary: str, tone: str = "friendly") -> str:
+        """要約からSlack向けのコメントを生成"""
+        if not self.llm or not summary:
+            return ""
+        prompt = (
+            f"以下の要約を基に、Slack向けに{tone}な一文コメントを日本語で作成してください。\n\n{summary}"
+        )
+        try:
+            response = self.llm.invoke(prompt)
+            return response.content.strip()
+        except Exception as e:
+            self.logger.debug(f"コメント生成失敗: {e}")
+            return ""
 
     def _sanitize_text(self, text: str) -> str:
         if not text:
