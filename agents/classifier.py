@@ -4,6 +4,7 @@ from typing import List, Dict, Any
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 from utils.logger import setup_logger, log_error
+from google.api_core.exceptions import ResourceExhausted
 
 
 class ClassifierAgent:
@@ -78,6 +79,9 @@ class ClassifierAgent:
             category = data.get("category", "Unknown")
             confidence = float(data.get("confidence", 0.0))
             return {"category": category, "confidence": confidence}
+        except ResourceExhausted as e:
+            self.logger.warning(f"分類でGemini APIのクォータを超過しました: {e}")
+            return {}
         except Exception as e:
             self.logger.debug(f"分類失敗: {e}")
             return {}
