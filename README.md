@@ -25,6 +25,7 @@ AWS や GCP などのクラウド技術、GPT/LLM を中心とした AI 技術�
 
 ## 🧠 AIエージェント実装概要
 
+
 本プロジェクトでは複数のエージェントが Python で実装され、`main.py` 内の `LeaderAgent` がそれらを順番に呼び出して処理します。
 
 ```python
@@ -39,6 +40,37 @@ classified = classifier.classify_articles(articles)
 summarized = summarizer.summarize_articles(classified)
 notifier.send_notification(summarized)
 ```
+
+各エージェントは `agents/` ディレクトリにあり、LangChain の `ChatGoogleGenerativeAI` を通じて Google Gemini を利用します。共通して環境変数 `GEMINI_API_KEY` を読み込み、次のようにモデルを初期化して指示文（プロンプト）を送ります。
+
+```python
+from langchain_google_genai import ChatGoogleGenerativeAI
+llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=os.getenv("GEMINI_API_KEY"))
+response = llm.invoke(prompt)  # prompt は指示文を含む文字列
+```
+
+### Geminiへのプロンプト例
+
+実際に送信しているプロンプト例:
+
+- **ClassifierAgent**
+  ```text
+  次の日本語記事を 'Cloud' または 'AI' のカテゴリに分類し、0から1の範囲で信頼度を数値で返してください。JSON 形式で {"category": "Cloud or AI", "confidence": 0-1} のみを出力してください。
+
+  タイトル: {title}
+  本文: {content}
+  ```
+- **SummarizerAgent**
+  ```text
+  以下の日本語記事を500文字以内で、要点をわかりやすく自然な文章で要約してください。
+
+  {content}
+  ```
+- **NotifierAgent**
+  ```text
+  以下の要約を基に、Slack向けに{tone}な一文コメントを日本語で作成してください。
+
+  {summary}
 
 
 | エージェント | 役割 | 主な実装ファイル |
