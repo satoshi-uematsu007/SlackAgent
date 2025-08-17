@@ -1,31 +1,38 @@
+import os
+import json
 from typing import List, Dict, Any
 
-import yaml
-
+from langchain_google_genai import ChatGoogleGenerativeAI
 from utils.logger import setup_logger, log_error
 
 
 class ClassifierAgent:
-    """キーワード辞書を用いたルールベースの記事分類エージェント"""
+    """Gemini を利用して記事をカテゴリ分類するエージェント"""
 
     def __init__(self, log_level: str = "INFO"):
         self.logger = setup_logger("ClassifierAgent", log_level)
 
-        # キーワード辞書読み込み
-        try:
-            with open("config/keywords.yaml", "r") as f:
-                data = yaml.safe_load(f)
-        except Exception as e:
-            log_error(self.logger, e, "キーワード読み込み失敗")
-            data = {}
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            self.logger.error(
+                "環境変数 GEMINI_API_KEY が設定されていません。Gemini 分類は無効化されます。"
+            )
+            self.llm = None
+            return
 
-        self.keyword_dict = {
-            "Cloud": [kw.lower() for kw in data.get("cloud", [])],
-            "AI": [kw.lower() for kw in data.get("ai", [])],
-        }
+        try:
+            self.llm = ChatGoogleGenerativeAI(
+                model="gemini-1.5-flash", google_api_key=api_key
+            )
+            self.logger.info(
+                "Gemini モデル（gemini-1.5-flash）を LangChain 経由で初期化しました。"
+            )
+        except Exception as e:
+            log_error(self.logger, e, "Gemini API 初期化失敗")
+            self.llm = None
 
     def classify_articles(self, articles: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """キーワードルールに基づき記事を分類する"""
+        """Gemini を使って記事を Cloud または AI に分類する"""
 
         self.logger.info(f"記事分類開始: {len(articles)}件")
 
@@ -37,29 +44,43 @@ class ClassifierAgent:
             if url in processed_urls:
                 continue
 
-            text = f"{article.get('title', '')} {article.get('content', '')}".lower()
-
-            cloud_count = sum(1 for kw in self.keyword_dict["Cloud"] if kw.lower() in text)
-            ai_count = sum(1 for kw in self.keyword_dict["AI"] if kw.lower() in text)
-
-            if cloud_count == 0 and ai_count == 0:
+            result = self._classify_single_article(article)
+            if not result:
                 continue
 
-            if cloud_count >= ai_count:
-                label = "Cloud"
-                score = cloud_count / max(1, cloud_count + ai_count)
-            else:
-                label = "AI"
-                score = ai_count / max(1, cloud_count + ai_count)
-
             article_classified = article.copy()
-            article_classified["category"] = label
-            article_classified["classification_confidence"] = min(1.0, score)
+            article_classified["category"] = result.get("category", "Unknown")
+            article_classified["classification_confidence"] = result.get("confidence", 0.0)
             classified.append(article_classified)
             processed_urls.add(url)
 
         self._log_classification_statistics(classified)
         return classified
+
+    def _classify_single_article(self, article: Dict[str, Any]) -> Dict[str, Any]:
+        """単一記事を Gemini により分類"""
+        if not self.llm:
+            return {}
+
+        title = article.get("title", "")
+        content = article.get("content", "")
+
+        prompt = (
+            "次の日本語記事を 'Cloud' または 'AI' のカテゴリに分類し、"
+            "0から1の範囲で信頼度を数値で返してください。"
+            "JSON 形式で {\"category\": \"Cloud or AI\", \"confidence\": 0-1} のみを出力してください。\n\n"
+            f"タイトル: {title}\n本文: {content}"
+        )
+
+        try:
+            response = self.llm.invoke(prompt)
+            data = json.loads(response.content)
+            category = data.get("category", "Unknown")
+            confidence = float(data.get("confidence", 0.0))
+            return {"category": category, "confidence": confidence}
+        except Exception as e:
+            self.logger.debug(f"分類失敗: {e}")
+            return {}
 
     def _log_classification_statistics(self, articles: List[Dict[str, Any]]):
         if not articles:

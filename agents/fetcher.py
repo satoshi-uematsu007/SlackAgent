@@ -1,3 +1,5 @@
+import os
+import json
 import feedparser
 import requests
 from bs4 import BeautifulSoup
@@ -8,6 +10,7 @@ import logging
 from utils.logger import setup_logger, log_error
 import re
 from urllib.parse import urlparse
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 class FetcherAgent:
     """
@@ -21,6 +24,24 @@ class FetcherAgent:
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (compatible; NewsBot/1.0; +https://example.com/bot)'
         })
+
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            self.logger.error(
+                "環境変数 GEMINI_API_KEY が設定されていません。タグ抽出は無効化されます。"
+            )
+            self.llm = None
+        else:
+            try:
+                self.llm = ChatGoogleGenerativeAI(
+                    model="gemini-1.5-flash", google_api_key=api_key
+                )
+                self.logger.info(
+                    "Gemini モデル（gemini-1.5-flash）を LangChain 経由で初期化しました。"
+                )
+            except Exception as e:
+                log_error(self.logger, e, "Gemini API 初期化失敗")
+                self.llm = None
         
         # RSS フィード一覧（信頼性の高いソース）
         self.rss_feeds = [
@@ -373,7 +394,7 @@ class FetcherAgent:
                         'published_at': entry.get('published', ''),
                         'source': feed_url,
                         'author': entry.get('author', ''),
-                        'tags': entry.get('tags', [])
+                        'tags': self._extract_tags_with_llm(full_content or summary),
                     }
                     articles.append(article)
                     
@@ -414,6 +435,24 @@ class FetcherAgent:
         except Exception as e:
             self.logger.debug(f"本文取得失敗: {url}, {str(e)}")
             return ""
+
+    def _extract_tags_with_llm(self, text: str) -> List[str]:
+        """Gemini を使って記事のタグを抽出"""
+        if not self.llm or not text:
+            return []
+        prompt = (
+            "以下の日本語テキストから技術的なキーワードを最大5つ抽出し、"
+            'JSON形式で{"tags": ["tag1", "tag2"]}のみを出力してください。\n\n'
+            f"{text}"
+        )
+        try:
+            response = self.llm.invoke(prompt)
+            data = json.loads(response.content)
+            tags = data.get("tags", []) if isinstance(data, dict) else data
+            return [str(t) for t in tags][:5]
+        except Exception as e:
+            self.logger.debug(f"タグ抽出失敗: {e}")
+            return []
     
     def _matches_keywords(self, content: str) -> bool:
         """
