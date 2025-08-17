@@ -40,7 +40,7 @@ summarized = summarizer.summarize_articles(classified)
 notifier.send_notification(summarized)
 ```
 
-各エージェントは `agents/` ディレクトリにあり、LangChain の `ChatGoogleGenerativeAI` を通じて Google Gemini を利用します。
+
 
 | エージェント | 役割 | 主な実装ファイル |
 | --- | --- | --- |
