@@ -1,20 +1,28 @@
-feedparser==6.0.10
+# requirements.txt (fixed, compatible with langchain-google-genai==0.0.6)
+
+# --- Core / data ---
+numpy==1.26.4
 requests==2.31.0
-beautifulsoup4==4.12.2
-sumy==0.11.0
-nltk==3.8.1
 pyyaml==6.0.1
 python-dotenv==1.0.0
 lxml==4.9.3
+beautifulsoup4==4.12.2
+feedparser==6.0.10
+sumy==0.11.0
+nltk==3.8.1
+protobuf==4.25.3
+
+# --- ML / NLP stack ---
 torch==2.2.0
 transformers==4.35.2
-numpy==1.26.4
 sentencepiece==0.1.99
-protobuf==4.25.3
+
+# --- LangChain & Google GenAI ---
+# langchain-google-genai 0.0.6 requires google-generativeai >=0.3.1,<0.4.0
 google-generativeai==0.3.2
 langchain-core==0.1.52
 langchain-google-genai==0.0.6
 
-# テスト用依存関係
+# --- Test ---
 pytest==7.4.3
 pytest-mock==3.12.0
