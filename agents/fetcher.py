@@ -11,6 +11,7 @@ from utils.logger import setup_logger, log_error
 import re
 from urllib.parse import urlparse
 from langchain_google_genai import ChatGoogleGenerativeAI
+from google.api_core.exceptions import ResourceExhausted
 
 class FetcherAgent:
     """
@@ -450,6 +451,9 @@ class FetcherAgent:
             data = json.loads(response.content)
             tags = data.get("tags", []) if isinstance(data, dict) else data
             return [str(t) for t in tags][:5]
+        except ResourceExhausted as e:
+            self.logger.warning(f"タグ抽出でGemini APIのクォータを超過しました: {e}")
+            return []
         except Exception as e:
             self.logger.debug(f"タグ抽出失敗: {e}")
             return []

@@ -4,6 +4,7 @@ from typing import List, Dict, Any
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 from utils.logger import setup_logger, log_error
+from google.api_core.exceptions import ResourceExhausted
 
 
 class ClassifierAgent:
@@ -22,10 +23,10 @@ class ClassifierAgent:
 
         try:
             self.llm = ChatGoogleGenerativeAI(
-                model="gemini-1.5-flash", google_api_key=api_key
+                model="gemini-2.5-flash", google_api_key=api_key
             )
             self.logger.info(
-                "Gemini モデル（gemini-1.5-flash）を LangChain 経由で初期化しました。"
+                "Gemini モデル（gemini-2.5-flash）を LangChain 経由で初期化しました。"
             )
         except Exception as e:
             log_error(self.logger, e, "Gemini API 初期化失敗")
@@ -78,6 +79,9 @@ class ClassifierAgent:
             category = data.get("category", "Unknown")
             confidence = float(data.get("confidence", 0.0))
             return {"category": category, "confidence": confidence}
+        except ResourceExhausted as e:
+            self.logger.warning(f"分類でGemini APIのクォータを超過しました: {e}")
+            return {}
         except Exception as e:
             self.logger.debug(f"分類失敗: {e}")
             return {}

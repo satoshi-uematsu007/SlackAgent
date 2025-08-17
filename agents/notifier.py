@@ -6,6 +6,7 @@ from typing import List, Dict, Any
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 from utils.logger import setup_logger, log_error
+from google.api_core.exceptions import ResourceExhausted
 
 class NotifierAgent:
     def __init__(self, webhook_url: str, log_level: str = "INFO"):
@@ -125,6 +126,9 @@ class NotifierAgent:
         try:
             response = self.llm.invoke(prompt)
             return response.content.strip()
+        except ResourceExhausted as e:
+            self.logger.warning(f"コメント生成でGemini APIのクォータを超過しました: {e}")
+            return ""
         except Exception as e:
             self.logger.debug(f"コメント生成失敗: {e}")
             return ""
