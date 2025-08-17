@@ -40,28 +40,7 @@ summarized = summarizer.summarize_articles(classified)
 notifier.send_notification(summarized)
 ```
 
-各エージェントは `agents/` ディレクトリにあり、LangChain の `ChatGoogleGenerativeAI` を通じて Google Gemini を利用します。共通して環境変数 `GEMINI_API_KEY` を読み込み、次のようにモデルを初期化して指示文（プロンプト）を送ります。
 
-```python
-from langchain_google_genai import ChatGoogleGenerativeAI
-llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=os.getenv("GEMINI_API_KEY"))
-response = llm.invoke(prompt)  # prompt は指示文を含む文字列
-```
-
-### Geminiへのプロンプト例
-
-- **ClassifierAgent** – タイトルと本文を渡し、カテゴリと信頼度を JSON で返すよう指示
-  ```text
-  次の日本語記事を 'Cloud' または 'AI' のカテゴリに分類し、0から1の範囲で信頼度を返してください…
-  ```
-- **SummarizerAgent** – 記事本文を 500 文字以内で自然な日本語に要約
-  ```text
-  以下の日本語記事を500文字以内で、要点をわかりやすく自然な文章で要約してください…
-  ```
-- **NotifierAgent** – 要約から Slack 向けの一文コメントを生成
-  ```text
-  以下の要約を基に、Slack向けにfriendlyな一文コメントを日本語で作成してください…
-  ```
 
 | エージェント | 役割 | 主な実装ファイル |
 | --- | --- | --- |

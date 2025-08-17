@@ -22,10 +22,10 @@ class ClassifierAgent:
 
         try:
             self.llm = ChatGoogleGenerativeAI(
-                model="gemini-1.5-flash", google_api_key=api_key
+                model="gemini-2.5-flash", google_api_key=api_key
             )
             self.logger.info(
-                "Gemini モデル（gemini-1.5-flash）を LangChain 経由で初期化しました。"
+                "Gemini モデル（gemini-2.5-flash）を LangChain 経由で初期化しました。"
             )
         except Exception as e:
             log_error(self.logger, e, "Gemini API 初期化失敗")
