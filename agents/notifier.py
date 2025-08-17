@@ -6,7 +6,6 @@ from typing import List, Dict, Any
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 from utils.logger import setup_logger, log_error
-from utils.quota import can_make_request, record_request
 from google.api_core.exceptions import ResourceExhausted
 
 class NotifierAgent:

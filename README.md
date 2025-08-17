@@ -41,7 +41,6 @@ notifier.send_notification(summarized)
 ```
 
 
-
 | エージェント | 役割 | 主な実装ファイル |
 | --- | --- | --- |
 | FetcherAgent | RSS 収集と信頼度スコア計算 | `agents/fetcher.py` |
@@ -145,6 +144,7 @@ SlackAgent/
 - **重複除去**: URL ベースの重複チェック
 - **補助AI**: Gemini を利用したタグ抽出（オプション）
 
+
 ### ClassifierAgent (記事分類)
 - **機能**: 記事を「Cloud」「AI」カテゴリに分類
 - **手法**: Gemini によるLLM分類
@@ -154,12 +154,25 @@ SlackAgent/
 - **機能**: Gemini を用いた日本語要約生成
 - **フォールバック**: モデル初期化失敗時は固定メッセージを返却
 
+
 ### NotifierAgent (Slack通知)
 - **機能**: Slack Webhook による通知
 - **フォーマット**: カテゴリ別整理、要約付き
 - **コメント生成**: Gemini による一言コメント
 - **エラー通知**: システムエラー時の通知機能
 - **制限**: 記事数制限（カテゴリ別最大5件）
+
+```python
+# agents/notifier.py より
+def _create_message(self, summary):
+    prompt = (
+        "以下の要約を基に、Slack向けにfriendlyな一文コメントを日本語で作成してください。\n\n"
+        f"{summary}"
+    )
+    comment = self.llm.invoke(prompt).content.strip()
+    payload = {"text": comment, ...}
+    requests.post(self.webhook_url, json=payload)
+```
 
 ### LeaderAgent (全体制御)
 - **機能**: 全体フロー制御、エラーハンドリング
