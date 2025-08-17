@@ -62,6 +62,9 @@ class ClassifierAgent:
         """単一記事を Gemini により分類"""
         if not self.llm:
             return {}
+        if not can_make_request():
+            self.logger.warning("Gemini APIリクエスト上限に達したため分類をスキップします")
+            return {}
 
         title = article.get("title", "")
         content = article.get("content", "")
@@ -75,6 +78,7 @@ class ClassifierAgent:
 
         try:
             response = self.llm.invoke(prompt)
+            record_request()
             data = json.loads(response.content)
             category = data.get("category", "Unknown")
             confidence = float(data.get("confidence", 0.0))

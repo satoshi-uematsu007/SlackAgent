@@ -120,11 +120,15 @@ class NotifierAgent:
         """要約からSlack向けのコメントを生成"""
         if not self.llm or not summary:
             return ""
+        if not can_make_request():
+            self.logger.warning("Gemini APIリクエスト上限に達したためコメント生成をスキップします")
+            return ""
         prompt = (
             f"以下の要約を基に、Slack向けに{tone}な一文コメントを日本語で作成してください。\n\n{summary}"
         )
         try:
             response = self.llm.invoke(prompt)
+            record_request()
             return response.content.strip()
         except ResourceExhausted as e:
             self.logger.warning(f"コメント生成でGemini APIのクォータを超過しました: {e}")

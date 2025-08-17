@@ -58,6 +58,9 @@ class SummarizerAgent:
 
         if not self.llm:
             return "（Geminiモデルが初期化されていません）"
+        if not can_make_request():
+            self.logger.warning("Gemini APIリクエスト上限に達したため要約をスキップします")
+            return "（Geminiのリクエスト上限に達しました）"
 
         try:
             prompt = (
@@ -65,6 +68,7 @@ class SummarizerAgent:
                 f"{content}"
             )
             response = self.llm.invoke(prompt)
+            record_request()
             return response.content.strip()
         except ResourceExhausted as e:
             self.logger.warning(f"Gemini 要約でクォータを超過しました: {e}")
