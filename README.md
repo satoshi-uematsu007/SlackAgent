@@ -1,8 +1,8 @@
 # 📘 マルチエージェント型Slack配信システム
 
-クラウド基盤（AWS, GCP, Azure, Kubernetesなど）やAI関連（GPT、LLM、MLOpsなど）の最新記事を1日1回自動で収集・分類・要約し、Slackに無料で通知するシステムです。
-
-- 日本語の記事のみを配信するよう言語フィルタを実装しています。
+AWS や GCP などのクラウド技術、GPT/LLM を中心とした AI 技術に関する最新記事を  
+1 日 1 回自動で収集・分類・要約し、Slack に通知するシステムです。  
+日本語の記事のみを対象にする言語フィルタも備えています。
 
 ## 🏗️ システム構成
 
@@ -23,6 +23,62 @@
                             📱 Slack通知
 ```
 
+## 🧠 AIエージェント実装概要
+
+本プロジェクトでは複数のエージェントが Python で実装され、`main.py` 内の `LeaderAgent` がそれらを順番に呼び出して処理します。
+
+```python
+# main.py より抜粋
+fetcher = FetcherAgent()
+classifier = ClassifierAgent()
+summarizer = SummarizerAgent()
+notifier = NotifierAgent(webhook_url)
+
+articles = fetcher.fetch_articles()
+classified = classifier.classify_articles(articles)
+summarized = summarizer.summarize_articles(classified)
+notifier.send_notification(summarized)
+```
+
+各エージェントは `agents/` ディレクトリにあり、LangChain の `ChatGoogleGenerativeAI` を通じて Google Gemini を利用します。共通して環境変数 `GEMINI_API_KEY` を読み込み、次のようにモデルを初期化して指示文（プロンプト）を送ります。
+
+```python
+from langchain_google_genai import ChatGoogleGenerativeAI
+llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=os.getenv("GEMINI_API_KEY"))
+response = llm.invoke(prompt)  # prompt は指示文を含む文字列
+```
+
+### Geminiへのプロンプト例
+
+実際に送信しているプロンプト例:
+
+- **ClassifierAgent**
+  ```text
+  次の日本語記事を 'Cloud' または 'AI' のカテゴリに分類し、0から1の範囲で信頼度を数値で返してください。JSON 形式で {"category": "Cloud or AI", "confidence": 0-1} のみを出力してください。
+
+  タイトル: {title}
+  本文: {content}
+  ```
+- **SummarizerAgent**
+  ```text
+  以下の日本語記事を500文字以内で、要点をわかりやすく自然な文章で要約してください。
+
+  {content}
+  ```
+- **NotifierAgent**
+  ```text
+  以下の要約を基に、Slack向けに{tone}な一文コメントを日本語で作成してください。
+
+  {summary}
+  ```
+
+| エージェント | 役割 | 主な実装ファイル |
+| --- | --- | --- |
+| FetcherAgent | RSS 収集と信頼度スコア計算 | `agents/fetcher.py` |
+| ClassifierAgent | 記事を「Cloud」「AI」に分類 | `agents/classifier.py` |
+| SummarizerAgent | Gemini による要約生成 | `agents/summarizer.py` |
+| NotifierAgent | Slack への投稿とコメント生成 | `agents/notifier.py` |
+
 ## 🚀 クイックスタート
 
 ### 1. 環境構築
@@ -30,7 +86,7 @@
 ```bash
 # リポジトリをクローン
 git clone <repository-url>
-cd news_agent
+cd SlackAgent
 
 # 仮想環境作成
 python3 -m venv venv
@@ -90,7 +146,7 @@ Expo のダッシュボードから生成されたビルドを確認し、`eas s
 ## 📂 ディレクトリ構成
 
 ```
-news_agent/
+SlackAgent/
 ├── main.py                    # LeaderAgent (メイン実行)
 ├── agents/
 │   ├── __init__.py
@@ -117,23 +173,66 @@ news_agent/
 - **対象サイト**: Zenn, Qiita, ClassMethod など
 - **フィルタリング**: 事前定義キーワードによる絞り込み
 - **重複除去**: URL ベースの重複チェック
+- **補助AI**: Gemini を利用したタグ抽出（オプション）
+
+```python
+# agents/fetcher.py より
+def _extract_tags(self, text):
+    prompt = f"次の文章から技術的キーワードを最大5つ抽出してください。\n\n{text}"
+    response = self.llm.invoke(prompt)
+    return response.content.splitlines()
+```
 
 ### ClassifierAgent (記事分類)
 - **機能**: 記事を「Cloud」「AI」カテゴリに分類
-- **手法**: 詳細なルールベース（キーワード辞書）
-- **設定**: `config/keywords.yaml` でキーワード管理
-- **複数分類**: 一つの記事が複数カテゴリに該当可能
+- **手法**: Gemini によるLLM分類
+- **出力**: カテゴリと信頼度スコアをJSONで返却
+
+```python
+# agents/classifier.py より
+def _classify_single_article(self, article):
+    prompt = (
+        "次の日本語記事を 'Cloud' または 'AI' のカテゴリに分類し、"
+        "0から1の範囲で信頼度を数値で返してください。"
+        "JSON 形式で {\"category\": \"Cloud or AI\", \"confidence\": 0-1} のみを出力してください。\n\n"
+        f"タイトル: {article['title']}\n本文: {article['content']}"
+    )
+    response = self.llm.invoke(prompt)
+    return json.loads(response.content)
+```
 
 ### SummarizerAgent (記事要約)
-- **機能**: 記事本文を150-300文字に要約
-- **手法**: Hugging Face 日本語T5モデルによるAI要約
-- **フォールバック**: AI要約失敗時はLexRank要約や文字数制限で対応
+- **機能**: Gemini を用いた日本語要約生成
+- **フォールバック**: モデル初期化失敗時は固定メッセージを返却
+
+```python
+# agents/summarizer.py より
+def _summarize_single_article(self, content):
+    prompt = (
+        "以下の日本語記事を500文字以内で、要点をわかりやすく自然な文章で要約してください。\n\n"
+        f"{content}"
+    )
+    return self.llm.invoke(prompt).content.strip()
+```
 
 ### NotifierAgent (Slack通知)
 - **機能**: Slack Webhook による通知
 - **フォーマット**: カテゴリ別整理、要約付き
+- **コメント生成**: Gemini による一言コメント
 - **エラー通知**: システムエラー時の通知機能
 - **制限**: 記事数制限（カテゴリ別最大5件）
+
+```python
+# agents/notifier.py より
+def _create_message(self, summary):
+    prompt = (
+        "以下の要約を基に、Slack向けにfriendlyな一文コメントを日本語で作成してください。\n\n"
+        f"{summary}"
+    )
+    comment = self.llm.invoke(prompt).content.strip()
+    payload = {"text": comment, ...}
+    requests.post(self.webhook_url, json=payload)
+```
 
 ### LeaderAgent (全体制御)
 - **機能**: 全体フロー制御、エラーハンドリング
@@ -172,7 +271,7 @@ jobs:
 
 ```bash
 # crontab -e
-0 9 * * * cd /path/to/news_agent && python main.py >> /var/log/news_agent.log 2>&1
+0 9 * * * cd /path/to/SlackAgent && python main.py >> /var/log/SlackAgent.log 2>&1
 ```
 
 ## 🛠️ カスタマイズ
