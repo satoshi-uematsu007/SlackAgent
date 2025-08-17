@@ -1,4 +1,4 @@
-# requirements.txt (fixed, compatible with langchain-google-genai==0.0.6)
+# requirements.txt (legacy-compatible)
 
 # --- Core / data ---
 numpy==1.26.4
@@ -13,12 +13,12 @@ nltk==3.8.1
 protobuf==4.25.3
 
 # --- ML / NLP stack ---
-torch==2.2.0
+torch==2.1.2
 transformers==4.35.2
 sentencepiece==0.1.99
 
-# --- LangChain & Google GenAI ---
-# langchain-google-genai 0.0.6 requires google-generativeai >=0.3.1,<0.4.0
+# --- LangChain & Google GenAI (旧SDK) ---
+# langchain-google-genai==0.0.6 は google-generativeai<0.4.0 を要求
 google-generativeai==0.3.2
 langchain-core==0.1.52
 langchain-google-genai==0.0.6
