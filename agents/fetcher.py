@@ -8,9 +8,11 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any
 import logging
 from utils.logger import setup_logger, log_error
+from utils.quota import can_make_request, record_request
 import re
 from urllib.parse import urlparse
 from langchain_google_genai import ChatGoogleGenerativeAI
+from google.api_core.exceptions import ResourceExhausted
 
 class FetcherAgent:
     """
@@ -440,6 +442,9 @@ class FetcherAgent:
         """Gemini を使って記事のタグを抽出"""
         if not self.llm or not text:
             return []
+        if not can_make_request():
+            self.logger.warning("Gemini APIリクエスト上限に達したためタグ抽出をスキップします")
+            return []
         prompt = (
             "以下の日本語テキストから技術的なキーワードを最大5つ抽出し、"
             'JSON形式で{"tags": ["tag1", "tag2"]}のみを出力してください。\n\n'
@@ -447,9 +452,13 @@ class FetcherAgent:
         )
         try:
             response = self.llm.invoke(prompt)
+            record_request()
             data = json.loads(response.content)
             tags = data.get("tags", []) if isinstance(data, dict) else data
             return [str(t) for t in tags][:5]
+        except ResourceExhausted as e:
+            self.logger.warning(f"タグ抽出でGemini APIのクォータを超過しました: {e}")
+            return []
         except Exception as e:
             self.logger.debug(f"タグ抽出失敗: {e}")
             return []

@@ -4,6 +4,8 @@ from typing import List, Dict, Any
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 from utils.logger import setup_logger, log_error
+from utils.quota import can_make_request, record_request
+from google.api_core.exceptions import ResourceExhausted
 
 
 class ClassifierAgent:
@@ -61,6 +63,9 @@ class ClassifierAgent:
         """単一記事を Gemini により分類"""
         if not self.llm:
             return {}
+        if not can_make_request():
+            self.logger.warning("Gemini APIリクエスト上限に達したため分類をスキップします")
+            return {}
 
         title = article.get("title", "")
         content = article.get("content", "")
@@ -74,10 +79,14 @@ class ClassifierAgent:
 
         try:
             response = self.llm.invoke(prompt)
+            record_request()
             data = json.loads(response.content)
             category = data.get("category", "Unknown")
             confidence = float(data.get("confidence", 0.0))
             return {"category": category, "confidence": confidence}
+        except ResourceExhausted as e:
+            self.logger.warning(f"分類でGemini APIのクォータを超過しました: {e}")
+            return {}
         except Exception as e:
             self.logger.debug(f"分類失敗: {e}")
             return {}

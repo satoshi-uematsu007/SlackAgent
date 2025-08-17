@@ -3,6 +3,8 @@ from typing import List, Dict, Any
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 from utils.logger import setup_logger, log_error
+from utils.quota import can_make_request, record_request
+from google.api_core.exceptions import ResourceExhausted
 
 class SummarizerAgent:
     """LangChain を通じて Google Gemini で記事要約を行うエージェント"""
@@ -57,6 +59,9 @@ class SummarizerAgent:
 
         if not self.llm:
             return "（Geminiモデルが初期化されていません）"
+        if not can_make_request():
+            self.logger.warning("Gemini APIリクエスト上限に達したため要約をスキップします")
+            return "（Geminiのリクエスト上限に達しました）"
 
         try:
             prompt = (
@@ -64,7 +69,11 @@ class SummarizerAgent:
                 f"{content}"
             )
             response = self.llm.invoke(prompt)
+            record_request()
             return response.content.strip()
+        except ResourceExhausted as e:
+            self.logger.warning(f"Gemini 要約でクォータを超過しました: {e}")
+            return "（Geminiのクォータを超過しました）"
         except Exception as e:
             self.logger.warning(f"Gemini 要約失敗: {str(e)}")
             return "（Geminiによる要約に失敗しました）"
